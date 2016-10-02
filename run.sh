@@ -53,8 +53,9 @@ EOF
 # ------------------
 if [ ! -f /wp-settings.php ]; then
   printf "=> Downloading wordpress... "
-  chown -R www-data:www-data /var/www/html
-  sudo -u www-data wp core download >/dev/null 2>&1 || \
+  # chown -R www-data:www-data /var/www/html
+  # sudo -u www-data wp core download >/dev/null 2>&1 || \
+  wp --allow-root core download >/dev/null 2>&1 || \
     ERROR $LINENO "Failed to download wordpress"
   printf "Done!\n"
 fi
@@ -79,7 +80,8 @@ printf "\t%s\n" \
 # -------------
 printf "=> Generating wp.config.php file... "
 rm -f /wp-config.php
-sudo -u www-data wp core config >/dev/null 2>&1 || \
+# sudo -u www-data wp core config >/dev/null 2>&1 || \
+wp --allow-root core config >/dev/null 2>&1 || \
   ERROR $LINENO "Could not generate wp-config.php file"
 printf "Done!\n"
 
@@ -87,7 +89,8 @@ printf "Done!\n"
 # --------------
 printf "=> Create database '%s'... " "$DB_NAME"
 if [ ! "$(wp core is-installed --allow-root >/dev/null 2>&1 && echo $?)" ]; then
-  sudo -u www-data wp db create >/dev/null 2>&1 || \
+  #sudo -u www-data wp db create >/dev/null 2>&1 || \
+  wp --allow-root db create >/dev/null 2>&1 || \
     ERROR $LINENO "Database creation failed"
   printf "Done!\n"
 
@@ -95,21 +98,22 @@ if [ ! "$(wp core is-installed --allow-root >/dev/null 2>&1 && echo $?)" ]; then
   if [ "$(stat -t /data/*.sql >/dev/null 2>&1 && echo $?)" ]; then
     DATA_PATH=$(find /data/*.sql | head -n 1)
     printf "=> Loading data backup from %s... " "$DATA_PATH"
-    sudo -u www-data wp db import "$DATA_PATH" >/dev/null 2>&1 || \
+#     sudo -u www-data wp db import "$DATA_PATH" >/dev/null 2>&1 || \
+    wp --allow-root db import "$DATA_PATH" >/dev/null 2>&1 || \
       ERROR $LINENO "Could not import database"
     printf "Done!\n"
 
     # If SEARCH_REPLACE is set => Replace URLs
     if [ "$SEARCH_REPLACE" != false ]; then
       printf "=> Replacing URLs... "
-      REPLACEMENTS=$(sudo -u www-data wp search-replace "$BEFORE_URL" "$AFTER_URL" \
+      REPLACEMENTS=$(wp --allow-root search-replace "$BEFORE_URL" "$AFTER_URL" \
         --no-quiet --skip-columns=guid | grep replacement) || \
         ERROR $((LINENO-2)) "Could not execute SEARCH_REPLACE on database"
       echo -ne "$REPLACEMENTS\n"
     fi
   else
     printf "=> No database backup found. Initializing new database... "
-    sudo -u www-data wp core install >/dev/null 2>&1 || \
+    wp --allow-root core install >/dev/null 2>&1 || \
       ERROR $LINENO "WordPress Install Failed"
     printf "Done!\n"
   fi
@@ -120,14 +124,14 @@ fi
 
 # Filesystem Permissions
 # ----------------------
-printf "=> Adjusting filesystem permissions... "
-groupadd -f docker && usermod -aG docker www-data
-find / -type d -exec chmod 755 {} \;
-find / -type f -exec chmod 644 {} \;
-mkdir -p /wp-content/uploads
-chmod -R 775 /wp-content/uploads && \
-  chown -R :docker /wp-content/uploads
-printf "Done!\n"
+# printf "=> Adjusting filesystem permissions... "
+# groupadd -f docker && usermod -aG docker www-data
+# find / -type d -exec chmod 755 {} \;
+# find / -type f -exec chmod 644 {} \;
+# mkdir -p /wp-content/uploads
+# chmod -R 775 /wp-content/uploads && \
+#   chown -R :docker /wp-content/uploads
+# printf "Done!\n"
 
 
 # Install Plugins
@@ -137,12 +141,12 @@ if [ "$PLUGINS" ]; then
   while IFS=',' read -ra plugin; do
     for i in "${!plugin[@]}"; do
       plugin_name=$(echo "${plugin[$i]}" | xargs)
-      sudo -u www-data wp plugin is-installed "${plugin_name}"
+      wp --allow-root plugin is-installed "${plugin_name}"
       if [ $? -eq 0 ]; then
         printf "=> ($((i+1))/${#plugin[@]}) Plugin '%s' found. SKIPPING...\n" "${plugin_name}"
       else
         printf "=> ($((i+1))/${#plugin[@]}) Plugin '%s' not found. Installing...\n" "${plugin_name}"
-        sudo -u www-data wp plugin install "${plugin_name}"
+        wp --allow-root plugin install "${plugin_name}"
       fi
     done
   done <<< "$PLUGINS"
@@ -153,21 +157,21 @@ fi
 
 # Make multisite
 # ---------------
-printf "=> Turn wordpress multisite on... "
-if [ "$MULTISITE" == "true" ]; then
-  sudo -u www-data wp core multisite-convert --allow-root >/dev/null 2>&1 || \
-    ERROR $LINENO "Failed to turn on wordpress multisite"
-  printf "Done!\n"
-else
-  printf "Skip!\n"
-fi
+# printf "=> Turn wordpress multisite on... "
+# if [ "$MULTISITE" == "true" ]; then
+#   wp --allow-root core multisite-convert --allow-root >/dev/null 2>&1 || \
+#     ERROR $LINENO "Failed to turn on wordpress multisite"
+#   printf "Done!\n"
+# else
+#   printf "Skip!\n"
+# fi
 
 
 # Operations to perform on first build
 # ------------------------------------
 if [ -d /wp-content/plugins/akismet ]; then
   printf "=> Removing default plugins... "
-  sudo -u www-data wp plugin uninstall akismet hello --deactivate
+  wp --allow-root wp plugin uninstall akismet hello --deactivate
   printf "Done!\n"
 
   printf "=> Removing unneeded themes... "
@@ -178,12 +182,12 @@ if [ -d /wp-content/plugins/akismet ]; then
       REMOVE_LIST=( "${REMOVE_LIST[@]/${theme[$i]}}" )
       THEME_LIST+=("${theme[$i]}")
     done
-    sudo -u www-data wp theme delete "${REMOVE_LIST[@]}"
+    wp --allow-root theme delete "${REMOVE_LIST[@]}"
   done <<< $THEMES
   printf "Done!\n"
 
   printf "=> Installing needed themes... "
-  sudo -u www-data wp theme install "${THEME_LIST[@]}"
+  wp --allow-root theme install "${THEME_LIST[@]}"
   printf "Done!\n"
 fi
 
