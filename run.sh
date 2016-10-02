@@ -1,5 +1,7 @@
 #!/bin/bash
 
+printf "starting run script......"
+
 SITE_TITLE=${SITE_TITLE:-'freshpress'}
 DB_HOST=${DB_HOST:-'db'}
 DB_NAME=${DB_NAME:-'wordpress'}
