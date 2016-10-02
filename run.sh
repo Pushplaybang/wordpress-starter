@@ -196,3 +196,5 @@ printf "\t%s\n" \
   "   WordPress Configuration Complete!" \
   "======================================="
 
+# stop the container from exiting  - hashtag cheapTricks
+tail -F -n0 /etc/hosts
