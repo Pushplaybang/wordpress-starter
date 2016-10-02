@@ -197,4 +197,4 @@ printf "\t%s\n" \
   "======================================="
 
 # stop the container from exiting  - hashtag cheapTricks
-tail -F -n0 /etc/hosts
+# tail -F -n0 /etc/hosts
