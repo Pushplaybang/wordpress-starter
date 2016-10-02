@@ -6,7 +6,7 @@ SITE_TITLE=${SITE_TITLE:-'freshpress'}
 DB_HOST=${DB_HOST:-'db'}
 DB_NAME=${DB_NAME:-'wordpress'}
 DB_PASS=${DB_PASS:-'wordpress'}
-DB_USER=${DB_USER:-'wordpress'}
+DB_USER=${DB_USER:-'root'}
 DB_PREFIX=${DB_PREFIX:-'wp_'}
 ADMIN_EMAIL=${ADMIN_EMAIL:-"admin@${DB_NAME}.com"}
 THEMES=${THEMES:-'twentysixteen'}
@@ -90,8 +90,7 @@ printf "Done!\n"
 printf "=> Create database '%s'... " "$DB_NAME"
 if [ ! "$(wp core is-installed --allow-root >/dev/null 2>&1 && echo $?)" ]; then
   #sudo -u www-data wp db create >/dev/null 2>&1 || \
-  wp --allow-root db create >/dev/null 2>&1 || \
-    ERROR $LINENO "Database creation failed"
+  wp --allow-root db create >/dev/null 2>&1 || true
   printf "Done!\n"
 
   # If an SQL file exists in /data => load it
