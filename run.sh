@@ -1,8 +1,10 @@
 #!/bin/bash
 
+SITE_TITLE=${SITE_TITLE:-'freshpress'}
 DB_HOST=${DB_HOST:-'db'}
 DB_NAME=${DB_NAME:-'wordpress'}
-DB_PASS=${DB_PASS:-'root'}
+DB_PASS=${DB_PASS:-'wordpress'}
+DB_USER=${DB_USER:-'wordpress'}
 DB_PREFIX=${DB_PREFIX:-'wp_'}
 ADMIN_EMAIL=${ADMIN_EMAIL:-"admin@${DB_NAME}.com"}
 THEMES=${THEMES:-'twentysixteen'}
@@ -21,37 +23,35 @@ ERROR () {
 
 # Configure wp-cli
 # ----------------
-cat > /app/wp-cli.yml <<EOF
+cat > /wp-cli.yml <<EOF
 quiet: true
-apache_modules:
-  - mod_rewrite
 
 core config:
-  dbuser: root
+  dbuser: $DB_USER
   dbpass: $DB_PASS
   dbname: $DB_NAME
   dbprefix: $DB_PREFIX
-  dbhost: $DB_HOST:3306
+  dbhost: $DB_HOST
   extra-php: |
     define('WP_DEBUG', ${WP_DEBUG,,});
     define('WP_DEBUG_LOG', ${WP_DEBUG_LOG,,});
     define('WP_DEBUG_DISPLAY', ${WP_DEBUG_DISPLAY,,});
 
 core install:
-  url: $([ "$AFTER_URL" ] && echo "$AFTER_URL" || echo localhost:8080)
-  title: $DB_NAME
-  admin_user: root
+  url: $([ "$AFTER_URL" ] && echo "$AFTER_URL" || echo localhost:8000)
+  title: $SITE_TITLE
+  admin_user: admin
   admin_password: $DB_PASS
   admin_email: $ADMIN_EMAIL
-  skip-email: true
+  skip-email: false
 EOF
 
 
 # Download WordPress
 # ------------------
-if [ ! -f /app/wp-settings.php ]; then
+if [ ! -f /wp-settings.php ]; then
   printf "=> Downloading wordpress... "
-  chown -R www-data:www-data /app /var/www/html
+  chown -R www-data:www-data /var/www/html
   sudo -u www-data wp core download >/dev/null 2>&1 || \
     ERROR $LINENO "Failed to download wordpress"
   printf "Done!\n"
@@ -62,6 +62,7 @@ fi
 # --------------
 printf "=> Waiting for MySQL to initialize... \n"
 while ! mysqladmin ping --host=$DB_HOST --password=$DB_PASS --silent; do
+  printf "...ping"
   sleep 1
 done
 
@@ -75,7 +76,7 @@ printf "\t%s\n" \
 # wp-config.php
 # -------------
 printf "=> Generating wp.config.php file... "
-rm -f /app/wp-config.php
+rm -f /wp-config.php
 sudo -u www-data wp core config >/dev/null 2>&1 || \
   ERROR $LINENO "Could not generate wp-config.php file"
 printf "Done!\n"
@@ -115,31 +116,15 @@ else
 fi
 
 
-# .htaccess
-# ---------
-if [ ! -f /app/.htaccess ]; then
-  printf "=> Generating .htaccess file... "
-  if [[ "$MULTISITE" == 'true' ]]; then
-    printf "Cannot generate .htaccess for multisite!"
-  else
-    sudo -u www-data wp rewrite flush --hard >/dev/null 2>&1 || \
-      ERROR $LINENO "Could not generate .htaccess file"
-    printf "Done!\n"
-  fi
-else
-  printf "=> .htaccess exists. SKIPPING...\n"
-fi
-
-
 # Filesystem Permissions
 # ----------------------
 printf "=> Adjusting filesystem permissions... "
 groupadd -f docker && usermod -aG docker www-data
-find /app -type d -exec chmod 755 {} \;
-find /app -type f -exec chmod 644 {} \;
-mkdir -p /app/wp-content/uploads
-chmod -R 775 /app/wp-content/uploads && \
-  chown -R :docker /app/wp-content/uploads
+find / -type d -exec chmod 755 {} \;
+find / -type f -exec chmod 644 {} \;
+mkdir -p /wp-content/uploads
+chmod -R 775 /wp-content/uploads && \
+  chown -R :docker /wp-content/uploads
 printf "Done!\n"
 
 
@@ -178,7 +163,7 @@ fi
 
 # Operations to perform on first build
 # ------------------------------------
-if [ -d /app/wp-content/plugins/akismet ]; then
+if [ -d /wp-content/plugins/akismet ]; then
   printf "=> Removing default plugins... "
   sudo -u www-data wp plugin uninstall akismet hello --deactivate
   printf "Done!\n"
@@ -206,10 +191,3 @@ printf "\t%s\n" \
   "   WordPress Configuration Complete!" \
   "======================================="
 
-
-# Start apache
-# ------------
-
-rm -f /var/run/apache2/apache2.pid
-source /etc/apache2/envvars
-exec apache2 -D FOREGROUND
