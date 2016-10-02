@@ -19,7 +19,7 @@ WP_DEBUG=${WP_DEBUG:-'false'}
   SEARCH_REPLACE=false
 
 ERROR () {
-  echo -e "\n=> $(tput -T xterm setaf 1)$(tput -T xterm bold)ERROR$(tput -T xterm sgr 0) (Line $1): $2.";
+  echo -e "\n=> (Line $1): $2.";
   exit 1;
 }
 
